@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TIPS — Three Idiots Paper Service</title>
+  <meta name="description" content="Experiment for Many Ways to Bind Paper — TIPS, Three Idiots Paper Service." />
+</head>
+<body class="hideScrollBar">
+  <!-- 스크롤 진행 길이를 만드는 실제 문서 높이 컨테이너 -->
+  <div id="scrollContent" class="scrollContent">
+    <main class="main" id="main"><!-- 씬들이 여기 주입됨 --></main>
+  </div>
+
+  <!-- 고정 레이어들 -->
+  <div class="gl" id="gl" aria-hidden="true"></div>          <!-- 떠다니는 이미지 무대 (원본 WebGL → DOM) -->
+  <nav class="nav" id="nav"></nav>                            <!-- Getty 워드마크 + 햄버거 + 챕터 패널 -->
+  <div class="scrollbarEl" id="scrollbarEl" aria-hidden="true"></div>
+  <div class="pageLoader" id="pageLoader"></div>
+  <div class="rotateNotice" id="rotateNotice">For optimal viewing experience, please rotate your device to portrait mode.</div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

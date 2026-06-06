@@ -1,0 +1,324 @@
+/* ============================================================
+   Getty — Tracing Art · 재구현
+   원본 토큰: html 10px 기준(1rem=10px), Bradford(serif) + Graphik(UI)
+   ============================================================ */
+
+/* ---- Fonts ---- */
+@font-face {
+  font-display: swap; font-family: Bradford; font-style: normal; font-weight: 400;
+  src: url(./fonts/bradford/BradfordLLSub-Regular.woff2) format("woff2"),
+       url(./fonts/bradford/BradfordLLSub-Regular.woff) format("woff");
+}
+@font-face {
+  font-display: swap; font-family: Bradford; font-style: italic; font-weight: 400;
+  src: url(./fonts/bradford/BradfordLL-LightItalic.otf) format("opentype");
+}
+/* Graphik(상용·원본 403)은 미확보 → 근접 폴백 스택 사용 */
+
+/* ---- Reset (원본 정신 계승) ---- */
+* { -webkit-tap-highlight-color: rgba(0,0,0,0);
+  -webkit-user-select: none; -moz-user-select: none; user-select: none; -webkit-user-drag: none; }
+input, textarea { -webkit-user-select: text; user-select: text; }
+html { box-sizing: border-box; font-size: 10px; -webkit-text-size-adjust: 100%; }
+html *, html *::before, html *::after { box-sizing: inherit; }
+body, hr { margin: 0; }
+hr { border: none; display: block; }
+img { display: block; max-width: 100%; }
+a, h1, h2, h3, h4, h5, h6, li, p { color: inherit; font: inherit; margin: 0; }
+ol, ul { list-style: none; margin: 0; padding: 0; }
+a { text-decoration: none; color: inherit; }
+button { background: none; border: none; color: inherit; font: inherit; cursor: pointer; padding: 0; }
+svg { fill: currentColor; }
+
+/* ---- Tokens ---- */
+:root {
+  --ink: #1a1a1a;
+  --ink-soft: #6f6f6f;
+  --paper: #ffffff;
+  --accent: #c0362c;          /* ledger 하이라이트 레드 */
+  --font-serif: Bradford, "Times New Roman", serif;
+  --font-ui: "Helvetica Neue", "Graphik", Inter, Arial, sans-serif;
+  --ease: cubic-bezier(.22,1,.36,1);
+  --bg: #ffffff;              /* 씬별로 JS가 바꿈 */
+}
+
+html, body { background: var(--bg); color: var(--ink); }
+body { font-family: var(--font-serif); transition: background-color .6s var(--ease); }
+body.hideScrollBar { scrollbar-width: none; }
+body.hideScrollBar::-webkit-scrollbar { display: none; }
+body.is-loading { overflow: hidden; }
+
+/* ---- Type utilities (원본 textH1/H2/BodyL/M 매핑) ---- */
+.textH1 { font-family: var(--font-serif); font-weight: 400; font-size: 15rem; letter-spacing: -.03em; line-height: 1; }
+.textH2 { font-family: var(--font-serif); font-weight: 400; font-size: 6rem; letter-spacing: -.02em; line-height: 1.2; }
+.textBodyL { font-family: var(--font-serif); font-weight: 400; font-size: 5rem; letter-spacing: -.02em; line-height: 1.12; }
+.textBodyM { font-family: var(--font-serif); font-weight: 400; font-size: 4rem; letter-spacing: -.02em; line-height: 1.2; }
+.textUI { font-family: var(--font-ui); font-weight: 500; font-size: 1.5rem; letter-spacing: .01em; line-height: 1.3; }
+.textCaption { font-family: var(--font-ui); font-weight: 400; font-size: 1.3rem; letter-spacing: .01em; line-height: 1.35; color: var(--ink); }
+.textCredit { font-family: var(--font-ui); font-weight: 400; font-size: 1.1rem; letter-spacing: .01em; line-height: 1.4; color: var(--ink-soft); }
+
+/* ============================================================
+   Layout layers
+   ============================================================ */
+.scrollContent { position: relative; width: 100%; }
+.main { position: relative; width: 100%; height: 100%; }
+
+/* 떠다니는 이미지 무대 (fixed, 화면 가득) */
+.gl { position: fixed; inset: 0; z-index: 1; pointer-events: none; overflow: hidden; }
+
+/* 씬 텍스트/콘텐츠 레이어 (fixed) */
+.scene { position: fixed; inset: 0; z-index: 5; display: flex; align-items: center; justify-content: center;
+  pointer-events: none; }
+.scene__inner { position: relative; width: 100%; max-width: 1280px; margin: 0 auto; padding: 0 4rem; text-align: center; }
+
+/* ============================================================
+   TIPS 로고 (세리프 T · 이탤릭 i · 볼드 산세리프 PS)
+   ============================================================ */
+.tipsLogo { display: inline-flex; align-items: baseline; line-height: 1; color: var(--ink);
+  letter-spacing: -.01em; }
+.tipsLogo .tips__t { font-family: var(--font-serif); font-weight: 400; }
+.tipsLogo .tips__i { font-family: var(--font-serif); font-style: italic; font-weight: 400;
+  padding: 0 .04em; transform: translateY(.02em); }
+.tipsLogo .tips__ps { font-family: var(--font-ui); font-weight: 700; letter-spacing: -.02em; }
+.tipsLogo--stacked { flex-direction: column; align-items: center; gap: .1em; line-height: .9; }
+.tipsLogo--stacked .tips__t { font-size: 1.35em; }
+.tipsLogo--stacked .tipsLogo__row { display: inline-flex; align-items: baseline; }
+
+/* 회전 정사각 프레임 (로고 이미지 2) */
+.tipsFrame { --tf: 6.4rem; position: relative; display: block;
+  width: calc(var(--tf) * 2); height: calc(var(--tf) * 2); }
+.tipsFrame__side { position: absolute; left: 50%; top: 50%; white-space: nowrap; }
+.tipsFrame .tipsLogo { font-size: 3.6rem; }
+
+/* ============================================================
+   Page loader  (TIPS frame)
+   ============================================================ */
+.pageLoader { position: fixed; inset: 0; z-index: 1000; background: var(--paper);
+  display: flex; align-items: center; justify-content: center; }
+.pageLoader.is-hidden { pointer-events: none; }
+
+/* ============================================================
+   Nav  (Getty 워드마크 · 햄버거 · 챕터 패널)
+   ============================================================ */
+.nav { position: fixed; inset: 0; z-index: 100; pointer-events: none; }
+.nav__logo { position: fixed; top: 2.8rem; left: 3.2rem; font-family: var(--font-serif); font-size: 2.8rem;
+  letter-spacing: -.01em; color: var(--ink); pointer-events: auto; }
+.nav__toggle { position: fixed; top: 2.4rem; right: 3.2rem; width: 4.4rem; height: 4.4rem; border-radius: 1.1rem;
+  background: #0d0d0d; display: grid; place-items: center; pointer-events: auto; }
+.nav__toggle span { display: block; width: 1.9rem; height: 1.5rem; position: relative; }
+.nav__toggle span::before, .nav__toggle span::after { content: ""; position: absolute; left: 0; right: 0; height: 1.5px;
+  background: #fff; transition: transform .4s var(--ease), top .3s var(--ease); }
+.nav__toggle span::before { top: 3px; }
+.nav__toggle span::after { top: 10px; }
+.nav.is-open .nav__toggle span::before { top: 6.5px; transform: rotate(45deg); }
+.nav.is-open .nav__toggle span::after { top: 6.5px; transform: rotate(-45deg); }
+
+.navPanel { position: fixed; top: 0; right: 0; height: 100vh; width: min(46rem, 92vw);
+  background: rgba(255,255,255,.72); -webkit-backdrop-filter: blur(22px); backdrop-filter: blur(22px);
+  pointer-events: auto; transform: translateX(100%); transition: transform .6s var(--ease);
+  display: flex; flex-direction: column; justify-content: center; padding: 6rem 4.4rem; }
+.nav.is-open .navPanel { transform: translateX(0); }
+.navPanel__label { font-family: var(--font-ui); font-size: 1.4rem; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--ink-soft); margin-bottom: 2.4rem; }
+.navPanel__chapters { display: flex; flex-direction: column; gap: 2.4rem; }
+.navPanel__chapter { display: flex; gap: 1.6rem; align-items: baseline; cursor: pointer; }
+.navPanel__num { font-family: var(--font-ui); font-size: 1.4rem; color: var(--ink-soft); width: 1.6rem; }
+.navPanel__title { font-family: var(--font-serif); font-size: 3.2rem; line-height: 1.05; letter-spacing: -.01em;
+  transition: opacity .3s; }
+.navPanel__chapter:hover .navPanel__title { opacity: .55; }
+.navPanel__brand { margin-top: 3.6rem; padding-top: 3.2rem; border-top: 1px solid rgba(0,0,0,.12); }
+.navPanel__slogan--en { font-family: var(--font-ui); font-weight: 600; font-size: 1.9rem; line-height: 1.15;
+  letter-spacing: -.01em; color: var(--ink); }
+.navPanel__slogan--kr { font-family: var(--font-ui); font-weight: 400; font-size: 1.4rem; line-height: 1.45;
+  color: var(--ink-soft); margin-top: 1.2rem; }
+.navPanel__copyright { font-family: var(--font-ui); font-size: 1.1rem; color: var(--ink-soft);
+  position: absolute; bottom: 3.2rem; left: 4.4rem; }
+
+/* 메뉴 열릴 때 배경 스크림 */
+.nav__scrim { position: fixed; inset: 0; background: rgba(0,0,0,0); pointer-events: none; transition: background .5s; }
+.nav.is-open .nav__scrim { background: rgba(0,0,0,.04); pointer-events: auto; }
+
+/* ============================================================
+   Custom scrollbar (우측)
+   ============================================================ */
+.scrollbarEl { position: fixed; top: 50%; right: 1.4rem; transform: translateY(-50%); z-index: 90;
+  width: 1.1rem; height: 9rem; border-radius: 1rem; background: rgba(0,0,0,.05); pointer-events: none; }
+.scrollbarEl__thumb { position: absolute; left: 50%; transform: translateX(-50%); top: 0;
+  width: .3rem; height: 2.2rem; border-radius: 1rem; background: rgba(0,0,0,.55); }
+
+/* ============================================================
+   Rotate notice (mobile landscape)
+   ============================================================ */
+.rotateNotice { position: fixed; inset: 0; z-index: 2000; background: var(--paper); display: none;
+  align-items: center; justify-content: center; text-align: center; padding: 4rem;
+  font-family: var(--font-ui); font-size: 1.8rem; color: var(--ink); }
+@media (max-width: 900px) and (orientation: landscape) {
+  .rotateNotice { display: flex; }
+}
+
+/* ============================================================
+   Floating painting element (gl 무대 위 img)
+   ============================================================ */
+.floatImg { position: absolute; will-change: transform, opacity; }
+.floatImg img { width: 100%; height: 100%; object-fit: cover; display: block;
+  box-shadow: 0 1.4rem 3.4rem rgba(0,0,0,.16), 0 .2rem .6rem rgba(0,0,0,.08); }
+.floatImg.is-placeholder { background: #f3f3f1; }
+
+/* ============================================================
+   Hero scene
+   ============================================================ */
+.hero { }
+.hero__overline { font-family: var(--font-ui); font-weight: 600; font-size: 1.6rem; letter-spacing: .005em;
+  color: var(--ink); margin-bottom: 2.6rem; }
+.hero__headline { font-family: var(--font-serif); font-weight: 400; font-size: 7.6rem; line-height: 1.08;
+  letter-spacing: -.02em; max-width: 16ch; margin: 0 auto; }
+.hero__scroll { margin-top: 4.4rem; display: inline-flex; align-items: center; gap: 1rem; pointer-events: auto;
+  background: #f3f2f0; border-radius: 4rem; padding: 1.3rem 2.2rem; font-family: var(--font-ui); font-weight: 500;
+  font-size: 1.5rem; color: var(--ink); }
+.hero__scroll svg { width: 1.4rem; height: 1.4rem; }
+.hero__scroll .arrow { animation: bobArrow 1.6s var(--ease) infinite; }
+@keyframes bobArrow { 0%,100%{transform:translateY(-2px)} 50%{transform:translateY(3px)} }
+
+.artTooltip { position: fixed; right: 3.2rem; bottom: 3.2rem; z-index: 80; background: #f3f2f0; border-radius: 4rem;
+  padding: 1.2rem 2rem; font-family: var(--font-ui); font-size: 1.4rem; color: var(--ink-soft); pointer-events: none;
+  opacity: 0; transition: opacity .5s; }
+.artTooltip.is-on { opacity: 1; }
+
+/* ============================================================
+   Chapter 1 — Binding a Book, Step by Step
+   ============================================================ */
+.floatImg--field img { box-shadow: 0 1rem 2.6rem rgba(0,0,0,.12); }
+
+.scene.ch1 { z-index: 5; }
+.ch1 .scene__inner, .ch1 { }
+
+.ch1__dim { position: absolute; inset: 0; background: #111; z-index: 1; }
+
+/* 챕터 인트로 카드 */
+.ch1__intro { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); z-index: 4;
+  width: min(72rem, 86vw); text-align: center; }
+.ch1__label { font-family: var(--font-ui); font-weight: 600; font-size: 1.4rem; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--ink-soft); margin-bottom: 1.8rem; }
+.ch1__title { font-family: var(--font-serif); font-size: 6.4rem; line-height: 1.05; letter-spacing: -.02em; }
+.ch1__introtext { font-family: var(--font-serif); font-size: 2.2rem; line-height: 1.4; color: var(--ink-soft);
+  margin-top: 2.4rem; }
+
+/* 중앙 포컬 책 */
+.ch1__focal { position: absolute; left: 50%; top: 40%; transform: translate(-50%,-50%); z-index: 2;
+  display: flex; flex-direction: column; align-items: center; gap: 1.6rem; margin: 0; }
+.ch1__focalimg { height: 42vh; }
+.ch1__focalimg img { height: 100%; width: 100%; object-fit: cover; display: block;
+  box-shadow: 0 2.4rem 6rem rgba(0,0,0,.24), 0 .4rem 1rem rgba(0,0,0,.12); }
+.ch1__caption { font-family: var(--font-ui); font-size: 1.4rem; color: var(--ink); text-align: center;
+  display: flex; flex-direction: column; gap: .5rem; max-width: 44rem; }
+.ch1__captitle { text-decoration: underline; text-underline-offset: 2px; }
+.ch1__credit { font-size: 1.1rem; color: var(--ink-soft); }
+
+/* 스테이지 비트 (스택 크로스페이드) */
+.ch1__beats { position: absolute; left: 50%; top: 75%; transform: translateX(-50%); z-index: 3;
+  width: min(66rem, 84vw); height: 14rem; }
+.ch1__beat { position: absolute; left: 0; right: 0; top: 0; text-align: center;
+  font-family: var(--font-serif); font-size: 3.2rem; line-height: 1.22; letter-spacing: -.01em; }
+.textBeat { will-change: transform, opacity; }
+
+/* 하단 타임라인 */
+.ch1__timeline { position: absolute; left: 50%; bottom: 6vh; transform: translateX(-50%); z-index: 4;
+  width: min(72rem, 82vw); }
+.ch1__track { position: relative; height: 1px; background: rgba(0,0,0,.18); }
+.ch1__dot { position: absolute; top: 50%; left: 0; width: 1rem; height: 1rem; border-radius: 50%;
+  background: var(--ink); transform: translate(-50%,-50%); }
+.ch1__stages { display: flex; justify-content: space-between; margin-top: 1.6rem; }
+.ch1__stage { font-family: var(--font-ui); font-weight: 500; font-size: 1.4rem; letter-spacing: .02em; }
+
+/* 콜로폰(판권) 줌 카드 */
+.ch1__colophon { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); z-index: 5;
+  width: min(54rem, 88vw); background: var(--paper); padding: 3.6rem 3.6rem 3rem; pointer-events: auto;
+  box-shadow: 0 4rem 10rem rgba(0,0,0,.5); }
+.ch1__zoomout { position: absolute; top: 1.4rem; left: 1.4rem; width: 3.4rem; height: 3.4rem; border-radius: 50%;
+  border: 1px solid rgba(0,0,0,.25); font-size: 2rem; line-height: 1; color: var(--ink); display: grid;
+  place-items: center; }
+.ch1__colhead { font-family: var(--font-serif); font-size: 2.6rem; margin-bottom: 2rem; text-align: center; }
+.ch1__rows { display: flex; flex-direction: column; }
+.ch1__row { display: flex; justify-content: space-between; gap: 2rem; padding: 1.1rem 1.2rem;
+  border-bottom: 1px solid rgba(0,0,0,.08); font-family: var(--font-ui); font-size: 1.5rem; }
+.ch1__row dt { color: var(--ink-soft); margin: 0; }
+.ch1__row dd { margin: 0; text-align: right; }
+.ch1__row.is-highlight { background: rgba(192,54,44,.08); box-shadow: inset 3px 0 0 var(--accent); }
+.ch1__row.is-highlight dd { color: var(--accent); font-weight: 600; }
+.ch1__colnote { font-family: var(--font-serif); font-size: 1.6rem; line-height: 1.45; color: var(--ink-soft);
+  margin-top: 2rem; text-align: center; }
+
+.ch1__closing { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); z-index: 4;
+  width: min(64rem, 84vw); text-align: center; font-family: var(--font-serif); font-size: 3.2rem;
+  line-height: 1.25; letter-spacing: -.01em; }
+
+/* ============================================================
+   Chapter 2 — Many Ways to Bind
+   ============================================================ */
+.scene.ch2 { z-index: 5; }
+.ch2__panel { position: absolute; inset: 0; }
+/* 중앙정렬은 GSAP의 xPercent/yPercent로(스케일/y 애니메이션과 충돌 방지) */
+.ch2__book { position: absolute; left: 50%; top: 33%; height: 34vh; margin: 0; }
+.ch2__book img { height: 100%; width: 100%; object-fit: cover; display: block;
+  box-shadow: 0 2.2rem 5.6rem rgba(0,0,0,.22), 0 .4rem 1rem rgba(0,0,0,.1); }
+.ch2__caption { position: absolute; left: 50%; top: 54%; transform: translateX(-50%); width: min(42rem, 82vw);
+  text-align: center; font-family: var(--font-ui); font-size: 1.5rem; line-height: 1.4; color: var(--ink-soft); }
+.ch2__name { position: absolute; left: 50%; top: 67%; white-space: nowrap;
+  font-size: 11rem !important; line-height: 1; text-align: center; }
+.ch2__kr { position: absolute; left: 50%; top: 80%; transform: translateX(-50%); font-family: var(--font-ui);
+  font-weight: 500; font-size: 1.6rem; letter-spacing: .12em; color: var(--ink-soft); }
+.ch2__closing { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); width: min(64rem,84vw);
+  text-align: center; font-family: var(--font-serif); font-size: 3.2rem; line-height: 1.25; }
+
+/* ============================================================
+   Chapter 3 — Paper, Press and Method (network)
+   ============================================================ */
+.scene.ch3 { z-index: 5; }
+.ch3__net { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%);
+  width: 72vmin; height: 72vmin; will-change: transform; }
+.ch3__thumb { position: absolute; transform: translate(-50%,-50%); aspect-ratio: 1; will-change: transform, opacity; }
+.ch3__thumb img { width: 100%; height: 100%; object-fit: cover; display: block; box-shadow: 0 .4rem 1.2rem rgba(0,0,0,.16); }
+.ch3__nodes { position: absolute; inset: 0; }
+.ch3__node { position: absolute; transform: translate(-50%,-50%); text-align: center; width: 22rem; }
+.ch3__nodename { display: block; font-family: var(--font-ui); font-weight: 600; font-size: 1.7rem; color: var(--ink); }
+.ch3__nodesub { display: block; font-family: var(--font-ui); font-size: 1.3rem; color: var(--ink-soft); margin-top: .3rem; }
+.ch3__beats { position: absolute; left: 6vw; top: 50%; transform: translateY(-50%); width: min(34rem, 40vw); height: 18rem; }
+.ch3__beat { position: absolute; left: 0; right: 0; top: 0; font-family: var(--font-serif); font-size: 2.8rem;
+  line-height: 1.28; letter-spacing: -.01em; }
+.ch3__closing { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); width: min(60rem,84vw);
+  text-align: center; font-family: var(--font-serif); font-size: 3.2rem; line-height: 1.25; }
+
+/* ============================================================
+   Outro — About TIPS
+   ============================================================ */
+.scene.outro { z-index: 5; }
+.outro__top { position: absolute; left: 50%; top: 19%; transform: translateX(-50%); width: min(92rem, 88vw); text-align: center; }
+.outro__overline { font-family: var(--font-ui); font-weight: 600; font-size: 1.6rem; color: var(--ink); margin-bottom: 2.4rem; }
+.outro__statement { font-size: 6rem; line-height: 1.16; letter-spacing: -.02em; }
+.outro__hl { color: var(--accent); background: rgba(192,54,44,.09); padding: 0 .18em; border-radius: .08em;
+  box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+.outro__about { position: absolute; left: 50%; top: 53%; transform: translateX(-50%); width: min(66rem, 86vw);
+  display: flex; gap: 3rem; align-items: flex-start; }
+.outro__aboutlabel { writing-mode: vertical-rl; transform: rotate(180deg); font-family: var(--font-serif);
+  font-size: 2.2rem; color: var(--ink-soft); white-space: nowrap; flex: none; }
+.outro__abouttext p { font-family: var(--font-serif); font-size: 1.9rem; line-height: 1.6; color: var(--ink); }
+.outro__abouttext p + p { margin-top: 1.4rem; text-indent: 2.4rem; }
+.outro__foot { position: absolute; left: 50%; bottom: 7%; transform: translateX(-50%); text-align: center; pointer-events: auto; }
+.outro__mark .tipsLogo { font-size: 4rem; }
+.outro__copy { font-family: var(--font-ui); font-size: 1.1rem; color: var(--ink-soft); margin-top: 1.2rem; }
+
+/* ============================================================
+   Responsive
+   ============================================================ */
+@media (max-width: 900px) {
+  .textH1 { font-size: 6.4rem; }
+  .textH2 { font-size: 4rem; }
+  .hero__headline { font-size: 4rem; }
+  .nav__logo { top: 2rem; left: 2rem; font-size: 2.2rem; }
+  .nav__toggle { top: 1.8rem; right: 2rem; }
+  .scene__inner { padding: 0 2.4rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero__scroll .arrow { animation: none; }
+}
